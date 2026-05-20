@@ -28,6 +28,10 @@ end
 
 DEFINE_BASECLASS( "lvs_base_wheeldrive" )
 
+function ENT:CalcViewDirectInput( ply, pos, angles, fov, pod )
+	return self:CalcTankView( ply, pos, angles, fov, pod )
+end
+
 function ENT:CalcViewDriver( ply, pos, angles, fov, pod )
 
 	angles = ply:EyeAngles()
