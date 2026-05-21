@@ -244,7 +244,7 @@ function ENT:InitWeapons()
 	weapon.OnThink = function( ent, active )
 		local base = ent:GetVehicle()
 
-		if not IsValid( base ) then return end
+		if not IsValid( base ) or base:GetSelectedWeapon() ~= 1 then return end
 
 		local Muzzle1 = base:GetAttachment( base:LookupAttachment( "machinegun_barell_right" ) )
 		local Muzzle2 = base:GetAttachment( base:LookupAttachment( "machinegun_barell_left" ) )
@@ -256,18 +256,29 @@ function ENT:InitWeapons()
 		local MuzzleAng = MuzzleDir:Angle()
 
 		local AimPos = ent:GetEyeTrace().HitPos
-	
+
 		local StartPos = MuzzlePos
 
 		local EndPos = AimPos
 
 		local Dir = (EndPos - StartPos):GetNormalized()
+		local AimAng = Dir:Angle()
 
-		local Pos, Ang = WorldToLocal( MuzzlePos, Dir:Angle(), MuzzlePos, MuzzleAng )
+		local Pos, Ang = WorldToLocal( MuzzlePos, AimAng, MuzzlePos, MuzzleAng )
 
 		local Rate = math.min( FrameTime() * 60, 0.99 )
 
-		base:SetPoseParameter("vehicle_weapon_yaw", base:GetPoseParameter("vehicle_weapon_yaw" ) + Ang.y * Rate )
+		local CurYaw = base:GetPoseParameter("vehicle_weapon_yaw" )
+		local DesYaw = base:WorldToLocalAngles( AimAng ).y
+
+		local SwapSides = (CurYaw > 0 and DesYaw < -90) or (CurYaw < 0 and DesYaw > 90)
+
+		if SwapSides then
+			base:SetPoseParameter("vehicle_weapon_yaw", CurYaw - CurYaw * Rate )
+		else
+			base:SetPoseParameter("vehicle_weapon_yaw", CurYaw + Ang.y * Rate )
+		end
+
 		base:SetPoseParameter("vehicle_weapon_pitch", base:GetPoseParameter("vehicle_weapon_pitch" ) - Ang.p * Rate )
 	end
 	weapon.HudPaint = function( ent, X, Y, ply )
@@ -279,6 +290,97 @@ function ENT:InitWeapons()
 		local Pos2D = AimPos:ToScreen()
 
 		local Col = base:MachinegunInRange( AimPos ) and COLOR_WHITE or COLOR_RED
+
+		base:PaintCrosshairCenter( Pos2D, Col )
+		base:LVSPaintHitMarker( Pos2D )
+	end
+	weapon.OnOverheat = function( ent )
+	end
+	self:AddWeapon( weapon )
+
+
+	local weapon = {}
+	weapon.Icon = Material("lvs/weapons/hmg.png")
+	weapon.Ammo = 1000
+	weapon.Delay = 0.025
+	weapon.HeatRateUp = 0.05
+	weapon.HeatRateDown = 0.5
+	weapon.Attack = function( ent )
+		local base = ent:GetVehicle()
+
+		local Attachments = {
+			[1] = {
+				Muzzle = "minigun_barell_left",
+				Shells = "minigun_shells_left",
+			},
+			[2] = {
+				Muzzle = "minigun_barell_right",
+				Shells = "minigun_shells_right",
+			},
+		}
+
+		local AimPos = ent:GetEyeTrace().HitPos
+
+		for id, data in ipairs( Attachments ) do
+			local Muzzle = base:GetAttachment( base:LookupAttachment( data.Muzzle ) )
+			local Shells = base:GetAttachment( base:LookupAttachment( data.Shells ) )
+
+			if not Muzzle or not Shells then continue end
+
+			local effectdata = EffectData()
+			effectdata:SetOrigin( Shells.Pos )
+			effectdata:SetAngles( Shells.Ang )
+			util.Effect( "RifleShellEject", effectdata, true, true )
+
+			local bullet = {}
+			bullet.Src 	= Muzzle.Pos
+			bullet.Dir 	= (AimPos - bullet.Src):GetNormalized()
+			bullet.Spread = Vector(0.07,0.07,0.07)
+			bullet.TracerName = "lvs_diprip_hitscan_tracer"
+			bullet.Force	= 4000
+			bullet.HullSize 	= 15
+			bullet.Damage	= 20
+			bullet.Velocity = 60000
+			bullet.Attacker 	= ent:GetDriver()
+			ent:LVSFireBullet( bullet )
+
+			local effectdata = EffectData()
+			effectdata:SetOrigin( Muzzle.Pos )
+			effectdata:SetNormal( Muzzle.Ang:Forward() )
+			effectdata:SetEntity( ent )
+			util.Effect( "lvs_muzzle", effectdata )
+
+		end
+
+		ent:TakeAmmo( 2 )
+
+		--"vehicle_minigun_spin"
+	end
+	weapon.StartAttack = function( ent )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) or not IsValid( base.SNDTurretRAC ) then return end
+
+		base.SNDTurretRAC:Play()
+	end
+	weapon.FinishAttack = function( ent )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) or not IsValid( base.SNDTurretRAC ) then return end
+
+		base.SNDTurretRAC:Stop()
+	end
+	weapon.OnThink = function( ent, active )
+	end
+	weapon.HudPaint = function( ent, X, Y, ply )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) then return end
+
+		local AimPos = ent:GetEyeTrace().HitPos
+		local Pos2D = AimPos:ToScreen()
+
+		local Col = COLOR_WHITE
 
 		base:PaintCrosshairCenter( Pos2D, Col )
 		base:LVSPaintHitMarker( Pos2D )
