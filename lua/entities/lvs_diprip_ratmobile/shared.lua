@@ -301,10 +301,10 @@ function ENT:InitWeapons()
 
 	local weapon = {}
 	weapon.Icon = Material("lvs/weapons/hmg.png")
-	weapon.Ammo = 1000
+	weapon.Ammo = 2200
 	weapon.Delay = 0.025
-	weapon.HeatRateUp = 0.05
-	weapon.HeatRateDown = 0.5
+	weapon.HeatRateUp = 0.25
+	weapon.HeatRateDown = 1
 	weapon.Attack = function( ent )
 		local base = ent:GetVehicle()
 
@@ -335,9 +335,10 @@ function ENT:InitWeapons()
 			local bullet = {}
 			bullet.Src 	= Muzzle.Pos
 			bullet.Dir 	= (AimPos - bullet.Src):GetNormalized()
-			bullet.Spread = Vector(0.07,0.07,0.07)
+			bullet.Spread = Vector(0.04,0.04,0.04)
 			bullet.TracerName = "lvs_diprip_hitscan_tracer"
 			bullet.Force	= 4000
+			bullet.Force1km	= 500
 			bullet.HullSize 	= 15
 			bullet.Damage	= 20
 			bullet.Velocity = 60000
