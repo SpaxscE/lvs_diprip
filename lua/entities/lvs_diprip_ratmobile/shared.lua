@@ -161,6 +161,45 @@ function ENT:MachinegunInRange( AimPos )
 	return math.abs( Angles.y ) <= 155 and math.abs( Angles.p ) < 20
 end
 
+function ENT:MinigunInRange( AimPos )
+	local Pos, _ = self:GetMinigunPosition()
+
+	local Angles = self:WorldToLocalAngles( (AimPos - Pos):Angle() )
+	Angles:Normalize()
+
+	return math.abs( Angles.y ) <= 20 and math.abs( Angles.p ) < 20
+end
+
+local MinigunAttachments = {
+	[1] = {
+		Muzzle = "minigun_barell_left",
+		Shells = "minigun_shells_left",
+	},
+	[2] = {
+		Muzzle = "minigun_barell_right",
+		Shells = "minigun_shells_right",
+	},
+}
+
+function ENT:GetMinigunPosition()
+	local Pos = Vector(0,0,0)
+	local Dir = Vector(0,0,0)
+
+	for id, data in ipairs( MinigunAttachments ) do
+		local Muzzle = self:GetAttachment( self:LookupAttachment( data.Muzzle ) )
+
+		if not Muzzle then continue end
+
+		Pos:Add( Muzzle.Pos )
+		Dir:Add( Muzzle.Ang:Forward() )
+	end
+
+	Pos:Mul( 0.5 )
+	Dir:Normalize()
+
+	return Pos, Dir
+end
+
 function ENT:InitWeapons()
 	local COLOR_RED = Color(255,0,0,255)
 	local COLOR_WHITE = Color(255,255,255,255)
@@ -187,7 +226,7 @@ function ENT:InitWeapons()
 				base.SNDTurretMG:Stop()
 			end
 
-			return
+			return true
 		end
 
 		if not Muzzle then return end
@@ -295,6 +334,7 @@ function ENT:InitWeapons()
 		base:LVSPaintHitMarker( Pos2D )
 	end
 	weapon.OnOverheat = function( ent )
+		ent:EmitSound("lvs/overheat.wav")
 	end
 	self:AddWeapon( weapon )
 
@@ -308,20 +348,23 @@ function ENT:InitWeapons()
 	weapon.Attack = function( ent )
 		local base = ent:GetVehicle()
 
-		local Attachments = {
-			[1] = {
-				Muzzle = "minigun_barell_left",
-				Shells = "minigun_shells_left",
-			},
-			[2] = {
-				Muzzle = "minigun_barell_right",
-				Shells = "minigun_shells_right",
-			},
-		}
+		if not IsValid( base ) or not IsValid( base.SNDTurretRAC ) then return end
 
 		local AimPos = ent:GetEyeTrace().HitPos
 
-		for id, data in ipairs( Attachments ) do
+		if not base:MinigunInRange( AimPos ) then
+			base.SNDTurretRAC:Stop()
+
+			return true
+		end
+
+		--fake windup
+		if ent:GetHeat() < 0.1 then
+			base.SNDTurretRAC:Stop()
+			return
+		end
+
+		for id, data in ipairs( MinigunAttachments ) do
 			local Muzzle = base:GetAttachment( base:LookupAttachment( data.Muzzle ) )
 			local Shells = base:GetAttachment( base:LookupAttachment( data.Shells ) )
 
@@ -350,12 +393,11 @@ function ENT:InitWeapons()
 			effectdata:SetNormal( Muzzle.Ang:Forward() )
 			effectdata:SetEntity( ent )
 			util.Effect( "lvs_muzzle", effectdata )
-
 		end
 
 		ent:TakeAmmo( 2 )
 
-		--"vehicle_minigun_spin"
+		base.SNDTurretRAC:Play()
 	end
 	weapon.StartAttack = function( ent )
 		local base = ent:GetVehicle()
@@ -372,6 +414,36 @@ function ENT:InitWeapons()
 		base.SNDTurretRAC:Stop()
 	end
 	weapon.OnThink = function( ent, active )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) or base:GetSelectedWeapon() ~= 2 then return end
+
+		base:SetPoseParameter("vehicle_minigun_spin", base:GetPoseParameter("vehicle_minigun_spin" ) + math.min( ent:GetHeat() * 10000, 2000 ) * FrameTime() )
+
+		local Muzzle1 = base:GetAttachment( base:LookupAttachment( "minigun_barell_right" ) )
+		local Muzzle2 = base:GetAttachment( base:LookupAttachment( "minigun_barell_left" ) )
+
+		if not Muzzle1 or not Muzzle2 then return end
+
+		local MuzzlePos = (Muzzle1.Pos + Muzzle2.Pos) * 0.5
+		local MuzzleDir = (Muzzle1.Ang:Forward() + Muzzle2.Ang:Forward()):GetNormalized()
+		local MuzzleAng = MuzzleDir:Angle()
+
+		local AimPos = ent:GetEyeTrace().HitPos
+
+		local StartPos = MuzzlePos
+
+		local EndPos = AimPos
+
+		local Dir = (EndPos - StartPos):GetNormalized()
+		local AimAng = Dir:Angle()
+
+		local Pos, Ang = WorldToLocal( MuzzlePos, AimAng, MuzzlePos, MuzzleAng )
+
+		local Rate = math.min( FrameTime() * 60, 0.99 )
+
+		base:SetPoseParameter("vehicle_minigun_yaw", base:GetPoseParameter("vehicle_minigun_yaw" ) + Ang.y * Rate )
+		base:SetPoseParameter("vehicle_minigun_pitch", base:GetPoseParameter("vehicle_minigun_pitch" ) + Ang.p * Rate )
 	end
 	weapon.HudPaint = function( ent, X, Y, ply )
 		local base = ent:GetVehicle()
@@ -381,12 +453,13 @@ function ENT:InitWeapons()
 		local AimPos = ent:GetEyeTrace().HitPos
 		local Pos2D = AimPos:ToScreen()
 
-		local Col = COLOR_WHITE
+		local Col = base:MinigunInRange( AimPos ) and COLOR_WHITE or COLOR_RED
 
-		base:PaintCrosshairCenter( Pos2D, Col )
+		base:PaintCrosshairOuter( Pos2D, Col )
 		base:LVSPaintHitMarker( Pos2D )
 	end
 	weapon.OnOverheat = function( ent )
+		ent:EmitSound("lvs/vehicles/222/cannon_overheat.wav")
 	end
 	self:AddWeapon( weapon )
 end
