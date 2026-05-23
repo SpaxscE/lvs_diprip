@@ -70,6 +70,6 @@ function EFFECT:Render()
 	local invScale = invS ^ DissipateExponentScale
 
 	render.SetMaterial( self.MatBeam )
-	render.DrawBeam( self.StartPos, self.EndPos, StartSizeOuter * Scale + EndSizeOuter * invScale, 1, 0, Color( 150, 80, 0, Alpha ) )
-	render.DrawBeam( self.StartPos, self.EndPos, StartSizeInner * Scale + EndSizeInner * invScale, 1, 0, Color( 255, 255, 125, Alpha ) )
+	render.DrawBeam( self.StartPos, self.EndPos, StartSizeOuter * Scale + EndSizeOuter * invScale, 1, 0, Color( 255, 80, 0, Alpha ) )
+	render.DrawBeam( self.StartPos, self.EndPos, StartSizeInner * Scale + EndSizeInner * invScale, 1, 0, Color( 255, 255, 255, Alpha ) )
 end

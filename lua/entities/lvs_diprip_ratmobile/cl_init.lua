@@ -44,3 +44,11 @@ function ENT:CalcViewPunch( ply, pos, angles, fov, pod )
 
 	return BaseClass.CalcViewPunch( self, ply, pos, angles, fov, pod )
 end
+
+function ENT:CalcViewOverride( ply, pos, angles, fov, pod )
+
+	-- fix camera clipping underground when upside down by moving it up
+	pos = pos + Vector(0,0,150) * math.abs( math.min( pod:GetUp().z, 0 ) )
+
+	return pos, angles, fov
+end

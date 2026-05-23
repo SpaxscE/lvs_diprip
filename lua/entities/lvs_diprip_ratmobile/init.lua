@@ -105,6 +105,64 @@ function ENT:DoMissileDistraction()
 	self:SetNextMissileDistraction( 3 )
 end
 
+function ENT:OnTick()
+	if self:GetUp().z > 0 then return end -- we are upside down...
+	if self:GetVelocity():LengthSqr() > 50000 then return end -- we are somewhat stationary
+	if self:WheelsOnGround() then return end -- wheels are on ground... are we in a looping upside down?
+
+	local ThrusterFR = self:GetAttachment( self:LookupAttachment( "thruster_physics_fr" ) )
+	local ThrusterFL = self:GetAttachment( self:LookupAttachment( "thruster_physics_fl" ) )
+	local ThrusterRR = self:GetAttachment( self:LookupAttachment( "thruster_physics_rr" ) )
+	local ThrusterRL = self:GetAttachment( self:LookupAttachment( "thruster_physics_rl" ) )
+
+	if not ThrusterFR or not ThrusterFL or not ThrusterRR or not ThrusterRL then return end
+
+	local PhysObj = self:GetPhysicsObject()
+	local ply = self:GetDriver()
+
+	if not IsValid( PhysObj ) or not IsValid( ply ) then return end
+
+	local ForceFront = ply:lvsKeyDown( "CAR_THROTTLE" ) and 1 or 0
+	local ForceRear = ply:lvsKeyDown( "CAR_BRAKE" ) and 1 or 0
+	local ForceLeft = ply:lvsKeyDown( "CAR_STEER_LEFT" ) and 1 or 0
+	local ForceRight = ply:lvsKeyDown( "CAR_STEER_RIGHT" ) and 1 or 0
+
+	local Force = PhysObj:GetMass() * FrameTime() * 1000
+
+	local ThrustFR = (ForceFront + ForceRight) * Force
+	local ThrustFL = (ForceFront + ForceLeft) * Force
+	local ThrustRR = (ForceRear + ForceRight) * Force
+	local ThrustRL = (ForceRear + ForceLeft) * Force
+
+	PhysObj:ApplyForceOffset( -ThrusterFR.Ang:Up() * ThrustFR, ThrusterFR.Pos )
+	PhysObj:ApplyForceOffset( -ThrusterFL.Ang:Up() * ThrustFL, ThrusterFL.Pos )
+	PhysObj:ApplyForceOffset( -ThrusterRR.Ang:Up() * ThrustRR, ThrusterRR.Pos )
+	PhysObj:ApplyForceOffset( -ThrusterRL.Ang:Up() * ThrustRL, ThrusterRL.Pos )
+
+	local T = CurTime()
+
+	if (self._NextThrustEffect or 0) > T then return end
+
+	local Flags = {
+		[1] = ThrustFR ~= 0,
+		[2] = ThrustFL ~= 0,
+		[3] = ThrustRR ~= 0,
+		[4] = ThrustRL ~= 0,
+	}
+
+	for flag, active in pairs( Flags ) do
+		if not active then continue end
+
+		local effectdata = EffectData()
+		effectdata:SetOrigin( self:GetPos() )
+		effectdata:SetEntity( self )
+		effectdata:SetFlags( flag )
+		util.Effect( "lvs_diprip_thruster", effectdata, true, true )
+
+		self._NextThrustEffect = T + 1.5
+	end
+end
+
 function ENT:MakeProjectile()
 	local ID = self:LookupAttachment( "mortar" )
 	local Muzzle = self:GetAttachment( ID )
