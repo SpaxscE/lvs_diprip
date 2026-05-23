@@ -72,4 +72,6 @@ function ENT:OnSpawn( PObj )
 			SpringRelativeDamping = 1800,
 		},
 	} )
+
+	self:UpdateSkin()
 end

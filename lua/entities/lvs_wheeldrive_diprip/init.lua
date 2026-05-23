@@ -2,6 +2,24 @@ AddCSLuaFile( "shared.lua" )
 AddCSLuaFile( "cl_init.lua" )
 include("shared.lua")
 
+function ENT:UpdateSkin()
+	timer.Simple(0, function()
+		if not IsValid( self ) then return end
+
+		local TEAM = self:GetAITEAM()
+
+		if TEAM == 1 then
+			self:SetSkin( 1 )
+		end
+		if TEAM == 2 then
+			self:SetSkin( 2 )
+		end
+		if TEAM == 3 then
+			self:SetSkin( 0 )
+		end
+	end)
+end
+
 function ENT:AlignView( ply )
 	if not IsValid( ply ) then return end
 
@@ -149,8 +167,6 @@ function ENT:FireProjectile()
 
 	self._ProjectileEntity = nil
 end
-
-
 
 function ENT:RunAI()
 	local Pod = self:GetDriverSeat()
