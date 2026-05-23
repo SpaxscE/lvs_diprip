@@ -52,6 +52,12 @@ function ENT:DoMissileDistraction()
 
 	self:EmitSound("lvs/diprip_countermeasure.wav",85,100,0.25)
 
+	if self:GetAI() then
+		self:SetNextMissileDistraction( math.random(3,13) )
+
+		return
+	end
+
 	self:SetNextMissileDistraction( 3 )
 end
 
