@@ -436,7 +436,7 @@ function ENT:InitWeapons()
 		projectile:Spawn()
 		projectile:Activate()
 		projectile:SetSpeed( 1000 + self:GetVelocity():Length() )
-		projectile:SetDamage( 1000 )
+		projectile:SetDamage( 2000 )
 		projectile:SetAttacker( IsValid( Driver ) and Driver or self )
 		projectile:SetEntityFilter( ent:GetCrosshairFilterEnts() )
 
