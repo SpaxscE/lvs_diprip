@@ -17,6 +17,8 @@ ENT.MDL_DESTROYED = "models/chaos126p/carpart16.mdl"
 
 ENT.MassCenterOverride = Vector(8,0,20)
 
+ENT.lvsShowInSpawner = true
+
 ENT.GibModels = {
 	"models/chaos126p/carpart01.mdl",
 	"models/chaos126p/carpart02.mdl",
