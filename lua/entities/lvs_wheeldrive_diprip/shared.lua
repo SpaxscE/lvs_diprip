@@ -90,6 +90,15 @@ function ENT:MachinegunInRange( AimPos )
 	return math.abs( Angles.y ) <= 155 and math.abs( Angles.p ) < 20
 end
 
+function ENT:MinigunInRange( AimPos )
+	local Pos, _ = self:GetMinigunPosition()
+
+	local Angles = self:WorldToLocalAngles( (AimPos - Pos):Angle() )
+	Angles:Normalize()
+
+	return math.abs( Angles.y ) <= 22 and math.abs( Angles.p ) < 22
+end
+
 local MinigunAttachments = {
 	[1] = {
 		Muzzle = "minigun_barell_left",
@@ -270,11 +279,15 @@ function ENT:InitWeapons()
 
 		if not IsValid( base ) or not IsValid( base.SNDTurretRAC ) then return end
 
+		local AimPos = ent:GetEyeTrace().HitPos
+
 		--fake windup
 		if ent:GetHeat() < 0.05 then
 			base.SNDTurretRAC:Stop()
 			return
 		end
+
+		local InRange = base:MinigunInRange( AimPos )
 
 		for id, data in ipairs( MinigunAttachments ) do
 			local Muzzle = base:GetAttachment( base:LookupAttachment( data.Muzzle ) )
@@ -289,7 +302,7 @@ function ENT:InitWeapons()
 
 			local bullet = {}
 			bullet.Src 	= Muzzle.Pos
-			bullet.Dir 	= Muzzle.Ang:Forward()
+			bullet.Dir 	= InRange and (AimPos - bullet.Src):GetNormalized() or Muzzle.Ang:Forward()
 			bullet.Spread = Vector(0.06,0.06,0.06)
 			bullet.TracerName = "lvs_diprip_hitscan_tracer_small"
 			bullet.Force	= 4000
@@ -362,29 +375,14 @@ function ENT:InitWeapons()
 
 		if not IsValid( base ) then return end
 
-		local Filter = base:GetCrosshairFilterEnts()
+		local AimPos = ent:GetEyeTrace().HitPos
 
-		local StartPos = Vector(0,0,0)
-		local EndPos = Vector(0,0,0)
+		local Col = base:MinigunInRange( AimPos ) and COLOR_WHITE or COLOR_RED
 
-		for id, data in ipairs( MinigunAttachments ) do
-			local Muzzle = base:GetAttachment( base:LookupAttachment( data.Muzzle ) )
+		local Pos2D = AimPos:ToScreen()
 
-			if not Muzzle then continue end
-
-			local trace = util.TraceLine( {
-				start = Muzzle.Pos,
-				endpos = (Muzzle.Pos + Muzzle.Ang:Forward() * 50000),
-				filter = Filter,
-			} )
-
-			EndPos:Add( trace.HitPos )
-			StartPos:Add( Muzzle.Pos )
-		end
-		EndPos:Mul( 0.5 )
-		StartPos:Mul( 0.5 )
-
-		base:LVSPaintHitMarker( EndPos:ToScreen() )
+		base:PaintCrosshairOuter( Pos2D, Col )
+		base:LVSPaintHitMarker( Pos2D )
 	end
 	weapon.OnOverheat = function( ent )
 		ent:EmitSound("lvs/vehicles/222/cannon_overheat.wav")
