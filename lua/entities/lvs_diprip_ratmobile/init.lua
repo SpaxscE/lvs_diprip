@@ -102,5 +102,60 @@ function ENT:DoMissileDistraction()
 
 	self:EmitSound("lvs/diprip_countermeasure.wav",85,100,0.25)
 
-	self:SetNextMissileDistraction( 4 )
+	self:SetNextMissileDistraction( 3 )
+end
+
+function ENT:MakeProjectile()
+	local ID = self:LookupAttachment( "mortar" )
+	local Muzzle = self:GetAttachment( ID )
+
+	if not Muzzle then return end
+
+	local Driver = self:GetDriver()
+
+	local projectile = ents.Create( "lvs_bomb" )
+	projectile:SetPos( Muzzle.Pos + Muzzle.Ang:Forward() * 15 )
+	projectile:SetAngles( Muzzle.Ang )
+	projectile:SetParent( self, ID )
+	projectile:Spawn()
+	projectile:Activate()
+	projectile:SetModel("models/misc/88mm_projectile.mdl")
+	projectile:SetAttacker( IsValid( Driver ) and Driver or self )
+	projectile:SetEntityFilter( self:GetCrosshairFilterEnts() )
+	projectile:SetSpeed( Muzzle.Ang:Forward() * (1000 + self:GetVelocity():Length()) )
+	projectile:SetDamage( 3500 )
+	projectile:SetRadius( 250 )
+	projectile.UpdateTrajectory = function( bomb )
+		bomb:SetSpeed( bomb:GetForward() * (1000 + self:GetVelocity():Length()) )
+	end
+
+	if projectile.SetMaskSolid then
+		projectile:SetMaskSolid( true )
+	end
+
+	projectile.ExplosionEffect = "lvs_diprip_explosion"
+
+	self._ProjectileEntity = projectile
+end
+
+function ENT:FireProjectile()
+	local ID = self:LookupAttachment( "mortar" )
+	local Muzzle = self:GetAttachment( ID )
+
+	if not Muzzle or not IsValid( self._ProjectileEntity ) then return end
+
+	self._ProjectileEntity:Enable()
+	self._ProjectileEntity:SetCollisionGroup( COLLISION_GROUP_NONE )
+	self._ProjectileEntity:EmitSound( "lvs/diprip_mortar.wav", 125 )
+
+	local effectdata = EffectData()
+		effectdata:SetOrigin( self._ProjectileEntity:GetPos() )
+		effectdata:SetEntity( self._ProjectileEntity )
+	util.Effect( "lvs_concussion_trail", effectdata )
+
+	self:TakeAmmo()
+	self:SetHeat( 1 )
+	self:SetOverheated( true )
+
+	self._ProjectileEntity = nil
 end

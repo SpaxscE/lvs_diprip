@@ -161,15 +161,6 @@ function ENT:MachinegunInRange( AimPos )
 	return math.abs( Angles.y ) <= 155 and math.abs( Angles.p ) < 20
 end
 
-function ENT:MinigunInRange( AimPos )
-	local Pos, _ = self:GetMinigunPosition()
-
-	local Angles = self:WorldToLocalAngles( (AimPos - Pos):Angle() )
-	Angles:Normalize()
-
-	return math.abs( Angles.y ) <= 20 and math.abs( Angles.p ) < 20
-end
-
 local MinigunAttachments = {
 	[1] = {
 		Muzzle = "minigun_barell_left",
@@ -342,7 +333,7 @@ function ENT:InitWeapons()
 	local weapon = {}
 	weapon.Icon = Material("lvs/weapons/hmg.png")
 	weapon.Ammo = 2200
-	weapon.Delay = 0.025
+	weapon.Delay = 0.05
 	weapon.HeatRateUp = 0.25
 	weapon.HeatRateDown = 1
 	weapon.Attack = function( ent )
@@ -350,16 +341,8 @@ function ENT:InitWeapons()
 
 		if not IsValid( base ) or not IsValid( base.SNDTurretRAC ) then return end
 
-		local AimPos = ent:GetEyeTrace().HitPos
-
-		if not base:MinigunInRange( AimPos ) then
-			base.SNDTurretRAC:Stop()
-
-			return true
-		end
-
 		--fake windup
-		if ent:GetHeat() < 0.1 then
+		if ent:GetHeat() < 0.05 then
 			base.SNDTurretRAC:Stop()
 			return
 		end
@@ -377,9 +360,9 @@ function ENT:InitWeapons()
 
 			local bullet = {}
 			bullet.Src 	= Muzzle.Pos
-			bullet.Dir 	= (AimPos - bullet.Src):GetNormalized()
-			bullet.Spread = Vector(0.04,0.04,0.04)
-			bullet.TracerName = "lvs_diprip_hitscan_tracer"
+			bullet.Dir 	= Muzzle.Ang:Forward()
+			bullet.Spread = Vector(0.06,0.06,0.06)
+			bullet.TracerName = "lvs_diprip_hitscan_tracer_small"
 			bullet.Force	= 4000
 			bullet.Force1km	= 500
 			bullet.HullSize 	= 15
@@ -450,16 +433,170 @@ function ENT:InitWeapons()
 
 		if not IsValid( base ) then return end
 
-		local AimPos = ent:GetEyeTrace().HitPos
-		local Pos2D = AimPos:ToScreen()
+		local Filter = base:GetCrosshairFilterEnts()
 
-		local Col = base:MinigunInRange( AimPos ) and COLOR_WHITE or COLOR_RED
+		local StartPos = Vector(0,0,0)
+		local EndPos = Vector(0,0,0)
 
-		base:PaintCrosshairOuter( Pos2D, Col )
-		base:LVSPaintHitMarker( Pos2D )
+		for id, data in ipairs( MinigunAttachments ) do
+			local Muzzle = base:GetAttachment( base:LookupAttachment( data.Muzzle ) )
+
+			if not Muzzle then continue end
+
+			local trace = util.TraceLine( {
+				start = Muzzle.Pos,
+				endpos = (Muzzle.Pos + Muzzle.Ang:Forward() * 50000),
+				filter = Filter,
+			} )
+
+			EndPos:Add( trace.HitPos )
+			StartPos:Add( Muzzle.Pos )
+		end
+		EndPos:Mul( 0.5 )
+		StartPos:Mul( 0.5 )
+
+		base:LVSPaintHitMarker( EndPos:ToScreen() )
 	end
 	weapon.OnOverheat = function( ent )
 		ent:EmitSound("lvs/vehicles/222/cannon_overheat.wav")
+	end
+	self:AddWeapon( weapon )
+
+
+	local weapon = {}
+	weapon.Icon = Material("lvs/weapons/missile.png")
+	weapon.Ammo = 16
+	weapon.Delay = 0 -- this will turn weapon.Attack to a somewhat think function
+	weapon.HeatRateUp = -0.5 -- cool down when attack key is held. This system fires on key-release.
+	weapon.HeatRateDown = 0.25
+	weapon.Attack = function( ent )
+		local T = CurTime()
+
+		if IsValid( ent._Missile ) then
+			if (ent._nextMissleTracking or 0) > T then return end
+
+			ent._nextMissleTracking = T + 0.1 -- 0.1 second interval because those find functions can be expensive
+
+			ent._Missile:FindTarget( ent:GetPos(), ent:GetForward(), 30, 7500 )
+
+			return
+		end
+
+		local T = CurTime()
+
+		if (ent._nextMissle or 0) > T then return end
+
+		ent._nextMissle = T + 0.5
+
+		ent._swapMissile = not ent._swapMissile
+
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) then return end
+
+		local Rocket = base:GetAttachment( base:LookupAttachment( ent._swapMissile and "rocket_barell_left" or "rocket_barell_right" ) )
+
+		if not Rocket then return end
+
+		local Driver = self:GetDriver()
+
+		local projectile = ents.Create( "lvs_missile" )
+		projectile:SetPos( Rocket.Pos )
+		projectile:SetAngles( Rocket.Ang )
+		projectile:SetParent( ent )
+		projectile:Spawn()
+		projectile:Activate()
+		projectile:SetSpeed( 1000 + self:GetVelocity():Length() )
+		projectile:SetDamage( 1000 )
+		projectile:SetAttacker( IsValid( Driver ) and Driver or self )
+		projectile:SetEntityFilter( ent:GetCrosshairFilterEnts() )
+
+		ent._Missile = projectile
+
+		ent:SetNextAttack( CurTime() + 0.1 ) -- wait 0.1 second before starting to track
+	end
+	weapon.FinishAttack = function( ent )
+		if not IsValid( ent._Missile ) then return end
+
+		local projectile = ent._Missile
+
+		if not IsValid( projectile:GetTarget() ) then
+			projectile.GetTarget = function( missile ) return missile end
+			projectile.GetTargetPos = function( missile )
+				return missile:LocalToWorld( Vector(150,0,0) + VectorRand() * math.random(-10,10) )
+			end
+		end
+		projectile:Enable()
+		projectile:EmitSound( "lvs/diprip_rocket.wav", 125 )
+
+		ent:TakeAmmo()
+
+		ent._Missile = nil
+
+		local NewHeat = ent:GetHeat() + 0.25
+
+		ent:SetHeat( NewHeat )
+		if NewHeat >= 1 then
+			ent:SetOverheated( true )
+		end
+	end
+	weapon.HudPaint = function( ent, X, Y, ply )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) then return end
+
+		local AimPos = ent:GetEyeTrace().HitPos
+		local Pos2D = AimPos:ToScreen()
+
+		base:LVSPaintHitMarker( Pos2D )
+	end
+	self:AddWeapon( weapon )
+
+
+
+
+	local weapon = {}
+	weapon.Icon = Material("lvs/weapons/bomb.png")
+	weapon.Ammo = 32
+	weapon.Delay = 2
+	weapon.HeatRateUp = 0
+	weapon.HeatRateDown = 1
+	weapon.StartAttack = function( ent )
+	
+		if self:GetAI() then return end
+
+		self:MakeProjectile()
+	end
+	weapon.FinishAttack = function( ent )
+		if self:GetAI() then return end
+
+		self:FireProjectile()
+	end
+	weapon.Attack = function( ent )
+		if not self:GetAI() then return end
+
+		self:MakeProjectile()
+		self:FireProjectile()
+	end
+	weapon.HudPaint = function( ent, X, Y, ply )
+		local Pos2D = ent:GetEyeTrace().HitPos:ToScreen()
+
+		ent:LVSPaintHitMarker( Pos2D )
+	end
+	weapon.OnThink = function( ent, active )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) or base:GetSelectedWeapon() ~= 4 then return end
+
+		local Attachment = base:GetAttachment( base:LookupAttachment( "mortar_ref" ) )
+
+		if not Attachment then return end
+
+		local Dir = (ent:GetEyeTrace().HitPos - Attachment.Pos):GetNormalized()
+		local Ang = self:WorldToLocalAngles( Dir:Angle() )
+
+		base:SetPoseParameter("vehicle_mortar_yaw", Ang.y )
+		base:SetPoseParameter("vehicle_mortar_pitch", -Ang.p + 15 )
 	end
 	self:AddWeapon( weapon )
 end
