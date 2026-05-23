@@ -44,3 +44,5 @@ function ENT:CalcViewOverride( ply, pos, angles, fov, pod )
 
 	return pos, angles, fov
 end
+
+list.Set( "ContentCategoryIcons", "[LVS] - D.I.P.R.I.P.", "icon16/lvs_diprip.png" )

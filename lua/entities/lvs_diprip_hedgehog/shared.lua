@@ -4,7 +4,7 @@ ENT.Base = "lvs_wheeldrive_diprip"
 ENT.PrintName = "Hedgehog"
 ENT.Author = "Luna"
 ENT.Information = "Luna's Vehicle Script"
-ENT.Category = "[LVS] - D.I.P.R.I.P"
+ENT.Category = "[LVS] - D.I.P.R.I.P."
 
 ENT.VehicleCategory = "Cars"
 ENT.VehicleSubCategory = "Armored"
