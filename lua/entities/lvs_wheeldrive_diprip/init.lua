@@ -149,3 +149,145 @@ function ENT:FireProjectile()
 
 	self._ProjectileEntity = nil
 end
+
+
+
+function ENT:RunAI()
+	local Pod = self:GetDriverSeat()
+
+	if not IsValid( Pod ) then self:SetAI( false ) return end
+
+	local RangerLength = 25000
+
+	local Target = self:AIGetTarget( 180 )
+
+	local StartPos = Pod:LocalToWorld( Pod:OBBCenter() )
+
+	local GotoPos, GotoDist = self:AIGetMovementTarget()
+
+	local TargetPos = GotoPos
+
+	local T = CurTime()
+
+	local IsTargetValid = IsValid( Target )
+
+	local TraceFilter = self:GetCrosshairFilterEnts()
+
+	local Front = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos + Pod:GetForward() * RangerLength } )
+	local FrontLeft = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos - Pod:LocalToWorldAngles( Angle(0,15,0) ):Right() * RangerLength } )
+	local FrontRight = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos - Pod:LocalToWorldAngles( Angle(0,-15,0) ):Right() * RangerLength } )
+	local FrontLeft1 = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos - Pod:LocalToWorldAngles( Angle(0,60,0) ):Right() * RangerLength } )
+	local FrontRight1 = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos - Pod:LocalToWorldAngles( Angle(0,-60,0) ):Right() * RangerLength } )
+	local FrontLeft2 = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos - Pod:LocalToWorldAngles( Angle(0,85,0) ):Right() * RangerLength } )
+	local FrontRight2 = util.TraceLine( { start = StartPos, filter = TraceFilter, endpos = StartPos - Pod:LocalToWorldAngles( Angle(0,-85,0) ):Right() * RangerLength } )
+
+	local traceWater = util.TraceLine( {
+		start = Front.HitPos,
+		endpos = Front.HitPos - Vector(0,0,50000),
+		filter = self:GetCrosshairFilterEnts(),
+		mask = MASK_WATER
+	} )
+
+	if traceWater.Hit then
+		Front.HitPos = StartPos
+	end
+
+	GotoPos = (Front.HitPos + FrontLeft.HitPos + FrontRight.HitPos + FrontLeft1.HitPos + FrontRight1.HitPos + FrontLeft2.HitPos + FrontRight2.HitPos) / 7
+
+	if IsTargetValid then
+		GotoPos = (GotoPos + Target:GetPos()) * 0.5
+	end
+
+	if not self:GetEngineActive() then
+		local Engine = self:GetEngine()
+
+		if IsValid( Engine ) then
+			if not Engine:GetDestroyed() then
+				self:StartEngine()
+			end
+		else
+			self:StartEngine()
+		end
+	end
+
+	if self:GetReverse() then
+		if Front.Fraction < 0.03 then
+			GotoPos = StartPos - Pod:GetForward() * 1000
+		end
+	else
+		if Front.Fraction < 0.01 then
+			GotoPos = StartPos - Pod:GetForward() * 1000
+		end
+	end
+
+	local TargetPosLocal = Pod:WorldToLocal( GotoPos )
+	local Throttle = math.min( math.max( TargetPosLocal:Length() - GotoDist, 0 ) / 10, 1 )
+
+	self:PhysWake()
+
+	self:SetPivotSteer( 0 )
+
+	if self:IsLegalInput() then
+		self:LerpThrottle( Throttle )
+
+		if Throttle == 0 then
+			self:LerpBrake( 1 )
+		else
+			self:LerpBrake( 0 )
+		end
+	else
+		self:LerpThrottle( 0 )
+		self:LerpBrake( Throttle )
+	end
+
+	self:SetReverse( TargetPosLocal.y < 0 )
+
+	self:ApproachTargetAngle( Pod:LocalToWorldAngles( (GotoPos - self:GetPos()):Angle() ) )
+
+	self:ReleaseHandbrake()
+
+	self._AIFireInput = false
+
+	if IsValid( self:GetHardLockTarget() ) then
+		Target = self:GetHardLockTarget()
+
+		TargetPos = Target:LocalToWorld( Target:OBBCenter() )
+
+		self._AIFireInput = true
+	else
+		if IsValid( Target ) then
+			local PhysObj = Target:GetPhysicsObject()
+			if IsValid( PhysObj ) then
+				TargetPos = Target:LocalToWorld( PhysObj:GetMassCenter() )
+			else
+				TargetPos = Target:LocalToWorld( Target:OBBCenter() )
+			end
+
+			self._AIFireInput = math.cos( CurTime() * 2 + self:EntIndex() * 1.337 ) > -0.5
+
+			local CurHeat = self:GetNWHeat()
+			local CurWeapon = self:GetSelectedWeapon()
+
+			if CurWeapon > 2 then
+				self:AISelectWeapon( 1 )
+			else
+				if CurHeat < 0.9 then
+					if CurWeapon == 1 then
+						self:AISelectWeapon( math.random(2,3) )
+
+					else
+						self:AISelectWeapon( 1 )
+					end
+				else
+					if CurHeat == 0 and math.cos( CurTime() ) > 0 then
+						self:AISelectWeapon( 1 )
+					end
+				end
+			end
+		end
+	end
+
+	T = T + self:EntIndex() * 1.337
+
+	self:SetAIAimVector( (TargetPos + Vector(0,math.sin( T * 0.5 ) * 30,math.cos( T * 2 ) * 30) - StartPos):GetNormalized() )
+end
