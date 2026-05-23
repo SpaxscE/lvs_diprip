@@ -42,7 +42,7 @@ end
 function ENT:DoMissileDistraction()
 	if not self:CanDoMissileDistraction() then return end
 
-	self:SetMissileNoTarget( 2 )
+	self:SetMissileNoTarget( 0.5 )
 
 	local Launcher = self:GetAttachment( self:LookupAttachment( "countermeasure" ) )
 
