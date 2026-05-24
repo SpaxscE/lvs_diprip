@@ -17,6 +17,8 @@ function ENT:UpdateSkin()
 		if TEAM == 3 then
 			self:SetSkin( 0 )
 		end
+
+		self.PhysicsWeightScale = 1.6
 	end)
 end
 
