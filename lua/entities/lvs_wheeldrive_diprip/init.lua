@@ -315,3 +315,9 @@ function ENT:RunAI()
 
 	self:SetAIAimVector( (TargetPos + Vector(0,math.sin( T * 0.5 ) * 30,math.cos( T * 2 ) * 30) - StartPos):GetNormalized() )
 end
+
+function ENT:OnCollision( data, physobj )
+	if not IsValid( data.HitEntity ) or data.HitEntity:GetClass() ~= "prop_physics_diprip" then return false end
+
+	return true
+end

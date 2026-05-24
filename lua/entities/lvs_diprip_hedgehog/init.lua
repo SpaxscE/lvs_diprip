@@ -7,11 +7,8 @@ function ENT:OnSpawn( PObj )
 	DriverSeat.HidePlayer = true
 	DriverSeat:SetCameraDistance( 0.3 )
 
+	self:AddEngine( Vector(40,0,10) )
 	self:AddFuelTank( Vector(-75,0,5), Angle(0,0,0), 3600, LVS.FUELTYPE_PETROL )
-
-	local Engine = self:AddEngine( Vector(40,0,10) )
-	Engine:SetMaxHP( 200 )
-	Engine:SetHP( 200 )
 
 	local ID = self:LookupAttachment( "machinegun_ref" )
 	local Muzzle = self:GetAttachment( ID )
