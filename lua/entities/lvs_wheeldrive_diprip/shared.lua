@@ -450,9 +450,18 @@ function ENT:InitWeapons()
 		local projectile = ent._Missile
 
 		if not IsValid( projectile:GetTarget() ) then
+			local Target = ent:GetEyeTrace().HitPos
+
 			projectile.GetTarget = function( missile ) return missile end
 			projectile.GetTargetPos = function( missile )
-				return missile:LocalToWorld( Vector(150,0,0) + VectorRand() * math.random(-10,10) )
+				if missile.HasReachedTarget then
+					return missile:LocalToWorld( Vector(100,0,0) )
+				end
+
+				if (missile:GetPos() - Target):Length() < 100 then
+					missile.HasReachedTarget = true
+				end
+				return Target
 			end
 		end
 		projectile:Enable()
@@ -477,6 +486,7 @@ function ENT:InitWeapons()
 		local AimPos = ent:GetEyeTrace().HitPos
 		local Pos2D = AimPos:ToScreen()
 
+		base:PaintCrosshairSquare( Pos2D, COLOR_WHITE )
 		base:LVSPaintHitMarker( Pos2D )
 	end
 	self:AddWeapon( weapon )
