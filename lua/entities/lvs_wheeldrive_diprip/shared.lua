@@ -101,6 +101,15 @@ function ENT:MinigunInRange( AimPos )
 	return math.abs( Angles.y ) <= 22 and math.abs( Angles.p ) < 22
 end
 
+function ENT:MissileInRange( AimPos )
+	local Pos, _ = self:GetMinigunPosition()
+
+	local Angles = self:WorldToLocalAngles( (AimPos - Pos):Angle() )
+	Angles:Normalize()
+
+	return math.abs( Angles.y ) <= 45 and math.abs( Angles.p ) < 45
+end
+
 local MinigunAttachments = {
 	[1] = {
 		Muzzle = "minigun_barell_left",
@@ -399,6 +408,10 @@ function ENT:InitWeapons()
 	weapon.HeatRateUp = -0.5 -- cool down when attack key is held. This system fires on key-release.
 	weapon.HeatRateDown = 0.25
 	weapon.Attack = function( ent )
+		local base = ent:GetVehicle()
+
+		if not IsValid( base ) then return end
+
 		local T = CurTime()
 
 		if IsValid( ent._Missile ) then
@@ -406,7 +419,11 @@ function ENT:InitWeapons()
 
 			ent._nextMissleTracking = T + 0.1 -- 0.1 second interval because those find functions can be expensive
 
-			ent._Missile:FindTarget( ent:GetPos(), ent:GetForward(), 30, 7500 )
+			if base:MissileInRange( ent:GetEyeTrace().HitPos ) then
+				ent._Missile:FindTarget( ent:GetPos(), ent:GetAimVector(), 30, 7500 )
+			else
+				ent._Missile:FindTarget( ent:GetPos(), ent:GetForward(), 30, 7500 )
+			end
 
 			return
 		end
@@ -418,10 +435,6 @@ function ENT:InitWeapons()
 		ent._nextMissle = T + 0.5
 
 		ent._swapMissile = not ent._swapMissile
-
-		local base = ent:GetVehicle()
-
-		if not IsValid( base ) then return end
 
 		local Rocket = base:GetAttachment( base:LookupAttachment( ent._swapMissile and "rocket_barell_left" or "rocket_barell_right" ) )
 
@@ -445,18 +458,16 @@ function ENT:InitWeapons()
 		ent:SetNextAttack( CurTime() + 0.1 ) -- wait 0.1 second before starting to track
 	end
 	weapon.FinishAttack = function( ent )
-		if not IsValid( ent._Missile ) then return end
+		local base = ent:GetVehicle()
+
+		if not IsValid( ent._Missile ) or not IsValid( base ) then return end
 
 		local projectile = ent._Missile
 
 		if not IsValid( projectile:GetTarget() ) then
 			local Target = ent:GetEyeTrace().HitPos
 
-			local base = ent:GetVehicle()
-
-			if not IsValid( base ) then return end
-
-			if base:MinigunInRange( Target ) then
+			if base:MissileInRange( Target ) then
 				projectile.GetTarget = function( missile ) return missile end
 				projectile.GetTargetPos = function( missile )
 					if missile.HasReachedTarget then
@@ -490,9 +501,10 @@ function ENT:InitWeapons()
 		if not IsValid( base ) then return end
 
 		local AimPos = ent:GetEyeTrace().HitPos
-		local Pos2D = AimPos:ToScreen()
 
-		local Col = base:MinigunInRange( AimPos ) and COLOR_WHITE or COLOR_RED
+		local Col = base:MissileInRange( AimPos ) and COLOR_WHITE or COLOR_RED
+
+		local Pos2D = AimPos:ToScreen()
 
 		base:PaintCrosshairSquare( Pos2D, Col )
 		base:LVSPaintHitMarker( Pos2D )
