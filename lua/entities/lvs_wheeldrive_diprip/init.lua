@@ -139,8 +139,7 @@ function ENT:MakeProjectile()
 	projectile:SetAttacker( IsValid( Driver ) and Driver or self )
 	projectile:SetEntityFilter( self:GetCrosshairFilterEnts() )
 	projectile:SetSpeed( Muzzle.Ang:Forward() * (1000 + self:GetVelocity():Length()) )
-	projectile:SetDamage( 4000 )
-	projectile:SetRadius( 250 )
+	projectile:SetDamage( 6500 )
 	projectile.UpdateTrajectory = function( bomb )
 		bomb:SetSpeed( bomb:GetForward() * (1000 + self:GetVelocity():Length()) )
 	end
@@ -148,8 +147,6 @@ function ENT:MakeProjectile()
 	if projectile.SetMaskSolid then
 		projectile:SetMaskSolid( true )
 	end
-
-	projectile.ExplosionEffect = "lvs_diprip_explosion"
 
 	self._ProjectileEntity = projectile
 end
